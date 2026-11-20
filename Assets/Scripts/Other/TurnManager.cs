@@ -17,7 +17,7 @@ public class TurnManager : MonoBehaviour
     }
 
     private turnState _currentTurn = turnState.PlayerTurn;//現在のターンと初期値設定 
-    private readonly List<Enemy> enemies = new List<Enemy>();//エネミーのリスト
+    private readonly List<EnemyController> enemies = new List<EnemyController>();//エネミーのリスト
 
     //プロパティ
     public turnState CurrentTurn//他から現在のターン状態を確認するプロパティ
@@ -36,7 +36,7 @@ public class TurnManager : MonoBehaviour
     }
 
     // 敵を登録するメソッド
-    public void RegisterEnemy(Enemy enemy)
+    public void RegisterEnemy(EnemyController enemy)
     {
         // もしenemyがnullでなく、かつenemiesリストに含まれていない場合は追加する
         if (enemy != null && !enemies.Contains(enemy))
@@ -46,7 +46,7 @@ public class TurnManager : MonoBehaviour
     }
 
     // 敵を登録解除するメソッド
-    public void UnregisterEnemy(Enemy enemy)
+    public void UnregisterEnemy(EnemyController enemy)
     {
         // もしenemyがnullの場合は何もしない
         if (enemy == null) return;
@@ -75,9 +75,9 @@ public class TurnManager : MonoBehaviour
 
         // enemiesリストのスナップショットを作成してからループを回す
         // これにより、敵が行動中に破棄等の処理でリストが変更されても安全に処理できる
-        List<Enemy> enemySnapshot = new List<Enemy>(enemies);
+        List<EnemyController> enemySnapshot = new List<EnemyController>(enemies);
 
-        foreach (Enemy enemy in enemySnapshot)
+        foreach (EnemyController enemy in enemySnapshot)
         {
             if (enemy == null) continue;
             enemy.TakeTurn();

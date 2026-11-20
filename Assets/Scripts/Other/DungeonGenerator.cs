@@ -52,10 +52,37 @@ public class DungeonGenerator : MonoBehaviour
     // 部屋の位置と大きさを保存
 　　private readonly List<RectInt> _rooms = new List<RectInt>();
 
+    // 外部公開用プロパティ
+    public IReadOnlyList<RectInt> Rooms => _rooms;//部屋リストの参照
+    public int MapWidth => _mapWidth;//マップの横幅参照
+    public int MapHeight => _mapHeight;//マップの縦幅参照
 
 
     //メソッド関連
-    private void MapGenerate()//マップ全体の生成
+    public int GetTileValue(int x, int y) //指定座標のタイル取得
+    { 
+        return _map[x, y]; 
+    }
+
+    // 指定座標が含まれる部屋を取得（部屋外なら false）
+    public bool TryGetRoomAt(Vector2Int gridPos, out RectInt foundRoom)
+    {
+        foreach (RectInt room in _rooms)
+        {
+            if (gridPos.x >= room.xMin + 1 && gridPos.x <= room.xMax - 2 &&
+                gridPos.y >= room.yMin + 1 && gridPos.y <= room.yMax - 2)
+            {
+                foundRoom = room;
+                return true;
+            }
+        }
+
+        foundRoom = default;
+        return false;
+    }
+
+    //マップ全体の生成
+    public void GenerateDungeon()
     {
         //マップの初期化
         _map = new int[_mapWidth, _mapHeight];
@@ -70,13 +97,15 @@ public class DungeonGenerator : MonoBehaviour
         }
         ConnectRoomsInOrder();
 
+        CreateBranches();
+
         CreateRoomBranches();
 
         InstantiateTile();
     }
 
-
-    private void CreateRoom()//部屋の生成
+    //部屋の生成
+    private void CreateRoom()
     {
         for (int i = 0; i < _maxRoomCreateCount; i++)//部屋生成の試行回数まで繰り返す
         {
@@ -107,7 +136,8 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    private bool IsOverlapping(int roomX, int roomY, int roomWidth, int roomHeight)//部屋が重なっていないかの判定メソッド
+    //部屋が重なっていないかの判定メソッド
+    private bool IsOverlapping(int roomX, int roomY, int roomWidth, int roomHeight)
     {
         for (int x = roomX - _roomMargin; x < roomX + roomWidth + _roomMargin; x++)//xの部屋間が+-_roomMarginになるまで繰り返す
         {
@@ -126,7 +156,8 @@ public class DungeonGenerator : MonoBehaviour
         return false; // 重なっていない
     }
 
-    private void ConnectRoomsInOrder()//部屋の中心から別の部屋への通路を作るメソッド
+    //部屋の中心から別の部屋への通路を作るメソッド
+    private void ConnectRoomsInOrder()
     {
 
         // 部屋が2つ未満なら終了
@@ -147,7 +178,8 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    private void CarveCorridorL(Vector2Int from, Vector2Int to)//
+    //L字型通路を作るメソッド
+    private void CarveCorridorL(Vector2Int from, Vector2Int to)
     {
         // 現在位置
         Vector2Int current = from;
@@ -188,7 +220,8 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    private void CreateBranches()//通路の枝分かれメソッド
+    //通路の枝分かれメソッド
+    private void CreateBranches()
     {
         List<Vector2Int> candidates = new List<Vector2Int>();
 
@@ -289,7 +322,9 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
     }
-    private void CreateRoomBranches()//部屋から行き止まりを作るメソッド
+
+    //部屋から行き止まりを作るメソッド
+    private void CreateRoomBranches()
     {
         if (_rooms.Count == 0) return;
 
@@ -380,7 +415,8 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    private Vector2Int GetRandomRoomEdge(RectInt room)//部屋の辺を取得し、ランダムに値を設定するメソッド
+    //部屋の辺を取得し、ランダムに値を設定するメソッド
+    private Vector2Int GetRandomRoomEdge(RectInt room)
     {
         // 0:左 1:右 2:上 3:下
         int side = Random.Range(0, 4);
@@ -413,21 +449,6 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    // プレイヤーをランダムな部屋の中にスポーンさせるメソッド
-    private void SpawnPlayerInRandomRoom() 
-    {
-        // 部屋が存在しない場合は処理を終了
-        if (_rooms.Count == 0) return;
-
-        RectInt room = _rooms[Random.Range(0, _rooms.Count)];
-
-        int x = Random.Range(room.xMin + 1, room.xMax - 1);
-        int y = Random.Range(room.yMin + 1, room.yMax - 1);
-        _playerGridPosition = new Vector2Int(x, y); // プレイヤーの座標を保存
-
-        Instantiate(_player, new Vector3(x + 0.5f, y + 0.5f, 0f), Quaternion.identity);
-    }
-
     // 二次元配列（map）の内容に基づいてタイルを配置するメソッド
     private void InstantiateTile() 
     {
@@ -455,57 +476,196 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    private void SpawnEnemies()
+    // 指定座標が床（1）かどうかを安全に判定する
+    public bool IsFloor(int x, int y)
     {
-        // 部屋が存在しない場合は終了
-        if (_rooms.Count == 0) return;
+        if (_map == null) return false;
+        if (x < 0 || x >= _mapWidth || y < 0 || y >= _mapHeight) return false;
+        return _map[x, y] == 1;
+    }
 
-        // 敵のプレハブが登録されていない場合は終了
-        if (_enemyPrefabs.Length == 0) return;
+    //壁を掘るメソッド
+    public bool DigTile(Vector2Int pos)
+    {
+        if (_map == null) return false;
 
-        // 敵を生成できる座標を保存するリスト
-        List<Vector2Int> candidates = new List<Vector2Int>();
+        // 外周の壁枠は掘れないようにする
+        if (pos.x <= 0 || pos.x >= _mapWidth - 1 || pos.y <= 0 || pos.y >= _mapHeight - 1)
+            return false;
 
-        // 全ての部屋から生成可能な座標を取得
-        foreach (RectInt room in _rooms)
+        // すでに床（1）なら何もしない
+        if (_map[pos.x, pos.y] == 1)
+            return false;
+
+        // 1. 1マス掘って床にする
+        _map[pos.x, pos.y] = 1;
+        Vector3Int tilePos = new Vector3Int(pos.x, pos.y, 0);
+        _wallTilemap.SetTile(tilePos, null);
+        _floorTilemap.SetTile(tilePos, _floorTile);
+
+        // 2. 既存の部屋と繋がって四角形になったか判定し、RectInt を拡張
+        if (TryExpandExistingRoomFromDig(pos))
         {
-            for (int x = room.xMin + 1; x < room.xMax - 1; x++)
+            return true;
+        }
+
+        // 3.（任意）既存部屋と繋がっていない場合でも、一定の広さの四角い床ができたら新規部屋に昇格
+        TryPromoteNewRectangleRoom(pos, minWidth: 4, minHeight: 4);
+
+        return true;
+    }
+
+    /// <summary>
+    /// 掘ったマス(digPos)を含む「すべて床(1)の四角形」を作り、
+    /// 既存の部屋とぴったり接して合体できるなら _rooms を拡張する
+    /// </summary>
+    private bool TryExpandExistingRoomFromDig(Vector2Int digPos)
+    {
+        // digPos を含む「すべて床(1)の極大長方形」を列挙
+        List<RectInt> floorRects = GetAllFloorRectanglesContaining(digPos);
+
+        for (int i = 0; i < _rooms.Count; i++)
+        {
+            RectInt room = _rooms[i];
+
+            foreach (RectInt rect in floorRects)
             {
-                for (int y = room.yMin + 1; y < room.yMax - 1; y++)
+                // すでに部屋の中ならスキップ
+                if (room.xMin <= rect.xMin && rect.xMax <= room.xMax &&
+                    room.yMin <= rect.yMin && rect.yMax <= room.yMax)
                 {
-                    Vector2Int pos = new Vector2Int(x, y);
+                    continue;
+                }
 
-                    // プレイヤーのいるマスは除外
-                    if (pos == _playerGridPosition) continue;
-
-                    candidates.Add(pos);
+                // 既存部屋と「辺」でぴったり接しているか判定
+                if (IsAdjacentAndCanMergeIntoRect(room, rect, out RectInt mergedRoom))
+                {
+                    _rooms[i] = mergedRoom;
+                    return true;
                 }
             }
         }
 
-        // 敵を生成する
-        for (int i = 0; i < _enemyCount; i++)
+        return false;
+    }
+
+    /// <summary>
+    /// 指定した座標(target)を必ず含む「全マス床(1)の長方形」をすべて求める
+    /// </summary>
+    private List<RectInt> GetAllFloorRectanglesContaining(Vector2Int target)
+    {
+        List<RectInt> results = new List<RectInt>();
+        if (!IsFloor(target.x, target.y)) return results;
+
+        // target を含む行（y）ごとに、左右にどこまで床が続くか調べる
+        int minY = target.y;
+        while (minY > 1 && IsFloor(target.x, minY - 1)) minY--;
+
+        int maxY = target.y;
+        while (maxY < _mapHeight - 2 && IsFloor(target.x, maxY + 1)) maxY++;
+
+        // 上端・下端を動かしながら、その範囲で横方向にどこまで全行床が続くか求める
+        for (int yStart = minY; yStart <= target.y; yStart++)
         {
-            // 生成できる場所がなくなったら終了
-            if (candidates.Count == 0) break;
+            for (int yEnd = target.y; yEnd <= maxY; yEnd++)
+            {
+                int xMin = target.x;
+                while (xMin > 1 && IsColumnAllFloor(xMin - 1, yStart, yEnd))
+                {
+                    xMin--;
+                }
 
-            // ランダムな座標を取得
-            int index = Random.Range(0, candidates.Count);
-            Vector2Int pos = candidates[index];
+                int xMax = target.x;
+                while (xMax < _mapWidth - 2 && IsColumnAllFloor(xMax + 1, yStart, yEnd))
+                {
+                    xMax++;
+                }
 
-            // 使用した座標をリストから削除
-            candidates.RemoveAt(index);
+                // RectInt の width / height は (max - min + 1)
+                results.Add(new RectInt(xMin, yStart, xMax - xMin + 1, yEnd - yStart + 1));
+            }
+        }
 
-            // ランダムな敵のプレハブを取得
-            int enemyIndex = Random.Range(0, _enemyPrefabs.Length);
-            GameObject enemy = _enemyPrefabs[enemyIndex];
+        return results;
+    }
 
-            // 敵を生成
-            Instantiate(
-                enemy,
-                new Vector3(pos.x + 0.5f, pos.y + 0.5f, 0f),
-                Quaternion.identity
-            );
+    private bool IsColumnAllFloor(int x, int yStart, int yEnd)
+    {
+        for (int y = yStart; y <= yEnd; y++)
+        {
+            if (!IsFloor(x, y)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// room と rect が上下または左右で接しており、
+    /// 合体した外接長方形の内部がすべて床(1)なら true を返す
+    /// </summary>
+    private bool IsAdjacentAndCanMergeIntoRect(RectInt room, RectInt rect, out RectInt merged)
+    {
+        merged = default;
+
+        // 左右で接しているケース（Y範囲が一致していること）
+        bool touchesLeft = (rect.xMax == room.xMin) && (rect.yMin == room.yMin && rect.yMax == room.yMax);
+        bool touchesRight = (room.xMax == rect.xMin) && (rect.yMin == room.yMin && rect.yMax == room.yMax);
+
+        // 上下で接しているケース（X範囲が一致していること）
+        bool touchesDown = (rect.yMax == room.yMin) && (rect.xMin == room.xMin && rect.xMax == room.xMax);
+        bool touchesUp = (room.yMax == rect.yMin) && (rect.xMin == room.xMin && rect.xMax == room.xMax);
+
+        if (!touchesLeft && !touchesRight && !touchesDown && !touchesUp)
+            return false;
+
+        int xMin = Mathf.Min(room.xMin, rect.xMin);
+        int yMin = Mathf.Min(room.yMin, rect.yMin);
+        int xMax = Mathf.Max(room.xMax, rect.xMax);
+        int yMax = Mathf.Max(room.yMax, rect.yMax);
+
+        // 合体した長方形のすべてが床(1)か確認（通路と繋がって欠けている箇所があればNG）
+        for (int x = xMin; x < xMax; x++)
+        {
+            for (int y = yMin; y < yMax; y++)
+            {
+                if (!IsFloor(x, y))
+                {
+                    return false;
+                }
+            }
+        }
+
+        merged = new RectInt(xMin, yMin, xMax - xMin, yMax - yMin);
+        return true;
+    }
+
+    /// <summary>
+    /// 既存部屋と繋がっていない場合でも、指定サイズ以上の床四角形ができたら新部屋にする
+    /// </summary>
+    private void TryPromoteNewRectangleRoom(Vector2Int digPos, int minWidth, int minHeight)
+    {
+        List<RectInt> floorRects = GetAllFloorRectanglesContaining(digPos);
+
+        foreach (RectInt rect in floorRects)
+        {
+            if (rect.width >= minWidth && rect.height >= minHeight)
+            {
+                // 既存の部屋と重なる場合は除外
+                bool overlapsExisting = false;
+                foreach (RectInt room in _rooms)
+                {
+                    if (room.Overlaps(rect))
+                    {
+                        overlapsExisting = true;
+                        break;
+                    }
+                }
+
+                if (!overlapsExisting)
+                {
+                    _rooms.Add(rect);
+                    return;
+                }
+            }
         }
     }
 
@@ -522,18 +682,4 @@ public class DungeonGenerator : MonoBehaviour
             Debug.Log(line);
         }
     }
-
-   
-
-
-
-
-    private void Start()
-    {
-        MapGenerate();
-        PrintMapToConsole();
-        SpawnPlayerInRandomRoom();
-        SpawnEnemies();
-    }
-
 }
