@@ -1,17 +1,27 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+[System.Serializable]
+public class EnemySpawnData
+{
+    public GameObject enemyPrefab;
+    public EnemyBaseData enemyBaseData;
+}
+
 public class EnemySpawner : MonoBehaviour
 {
     [SerializeField] private DungeonGenerator _dungeonGenerator;
     [SerializeField] private PlayerSpawner _playerSpawner;
-    [SerializeField] private GameObject[] _enemyPrefabs;
-    [SerializeField] private int _enemyCount = 5;
+    [SerializeField] private EnemySpawnData[] _enemySpawnDatas;
+    [SerializeField] private int _enemyCount = 5;//初期配置の数
+    [SerializeField] private int _spawnInterval = 40;//スポーン間隔
+    [SerializeField] private int _maxEnemyCount = 18;//敵の最大数
+    [SerializeField] private int _initialEnemyCount;//敵の現在数格納用
 
     public void SpawnEnemies()
     {
         if (_dungeonGenerator == null || _dungeonGenerator.Rooms.Count == 0) return;
-        if (_enemyPrefabs == null || _enemyPrefabs.Length == 0) return;
+        if (_enemySpawnDatas == null || _enemySpawnDatas.Length == 0) return;
 
         List<Vector2Int> candidates = new List<Vector2Int>();
         Vector2Int playerPos = _playerSpawner != null ? _playerSpawner.PlayerGridPosition : Vector2Int.zero;
@@ -37,9 +47,10 @@ public class EnemySpawner : MonoBehaviour
             Vector2Int pos = candidates[index];
             candidates.RemoveAt(index);
 
-            GameObject prefab = _enemyPrefabs[Random.Range(0, _enemyPrefabs.Length)];
+            EnemySpawnData spawnData =_enemySpawnDatas[Random.Range(0, _enemySpawnDatas.Length)];
+
             GameObject enemyObj = Instantiate(
-                prefab,
+                spawnData.enemyPrefab,
                 new Vector3(pos.x + 0.5f, pos.y + 0.5f, 0f),
                 Quaternion.identity
             );
@@ -48,6 +59,7 @@ public class EnemySpawner : MonoBehaviour
             if (enemyObj.TryGetComponent(out EnemyController enemy))
             {
                 enemy.Initialize(_dungeonGenerator, _playerSpawner);
+                enemy.SetBaseData(spawnData.enemyBaseData);
             }
         }
     }

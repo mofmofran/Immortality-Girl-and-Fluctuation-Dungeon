@@ -19,6 +19,10 @@ public class TurnManager : MonoBehaviour
     private turnState _currentTurn = turnState.PlayerTurn;//現在のターンと初期値設定 
     private readonly List<EnemyController> enemies = new List<EnemyController>();//エネミーのリスト
 
+    private int _turnCount=0;//累計ターン
+    private int _floorTurnCount=0;//その階でのターン
+
+
     //プロパティ
     public turnState CurrentTurn//他から現在のターン状態を確認するプロパティ
     {

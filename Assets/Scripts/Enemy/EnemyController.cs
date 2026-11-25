@@ -1,22 +1,29 @@
+using UnityEditor.Overlays;
 using UnityEngine;
 
 public class EnemyController : MonoBehaviour
 {
     [Header("基礎ステータス")]
-    public string name = "";
+    public string enemyName = "";
     public int maxHP;//最大HP
     public int hP;//現在HP
 
     public int attackPower;//攻撃力
     public int armor;//守備力
-
+    public int range;//維持する距離
     public int visionRange = 2;//通路内の視界
-
+    public int exp;//経験値
+    public float dropChance;//ドロップ率
+    private bool _isSpecial;//特殊能力があるか
+    public SpeedType speedType;//速度
     GameObject player;//Playerの格納変数
 
+    [SerializeField]
+    private EnemyBaseData _baseData;
+    [SerializeField]
+    private EnemySpecialData _specialData;
     private DungeonGenerator _dungeonGenerator;
     private PlayerSpawner _playerSpawner;
-
 
 
     // プレイヤーを発見関連
@@ -78,6 +85,43 @@ public class EnemyController : MonoBehaviour
         return false;
     }
 
+    //敵のデータをSOから取得
+    public void SetBaseData(EnemyBaseData data)
+    {
+        _baseData = data;
+
+        enemyName = _baseData.enemyName;
+        maxHP = _baseData.maxHP;
+        hP = _baseData.maxHP;
+
+        attackPower = _baseData.attackPoint;
+        armor = _baseData.defensePoint;
+
+        range = _baseData.range;
+        visionRange = _baseData.visionRange;
+
+        exp = _baseData.exp;
+        dropChance = _baseData.dropChance;
+
+        _isSpecial = _baseData.isSpecial;
+        speedType = _baseData.speedType;
+    }
+
+    //敵の種族取得メソッド
+    public bool HasType(EnemyType type)
+    {
+        if (_baseData == null || _baseData.enemyTypes == null)
+            return false;
+
+        foreach (EnemyType enemyType in _baseData.enemyTypes)
+        {
+            if (enemyType == type)
+                return true;
+        }
+
+        return false;
+    }
+
     // 敵のターン
     public void TakeTurn()
     {
@@ -96,8 +140,12 @@ public class EnemyController : MonoBehaviour
         //    Debug.Log("プレイヤーに近づく！");
         //}
     }
-       
-        void Start()
+
+    private void Awake()
+    {
+        
+    }
+    void Start()
         {
             player = GameObject.FindGameObjectWithTag("Player");
         }
